@@ -1,0 +1,61 @@
+#Resouece creation for Serverless Image_Processing
+
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Cloud Formation template for creating Resoueces for Serverless Image_Processing"
+
+Resources:
+  myIputDatabucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      AccessControl: Private
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: "S3:ObjectCreated:*"
+            Function: !GetAtt "MyimagePorcessingLambda.Arn"
+
+  myInputDataBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref myIputDatabucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - "s3:GetObject"
+            Effect: Allow
+            Principal: !GetAtt "myLambdaExeRole.Arn" #ARN of myExeLambda IAM Role needs to get updated here
+            Resource: !Sub "arn:aws:s3:::${myIputDatabucket}/*"
+
+  myOutputDatabucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerPreferred
+      AccessControl: Private
+
+  myOutputDatabucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref myOutputDatabucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - "s3:PutObject"
+            Effect: Allow
+            Principal: !GetAtt "myLambdaExeRole.Arn" #ARN of myExeLambda IAM Role needs to get updated here
+            Resource: !Sub "arn:aws:s3:::${myOutputDatabucket}/*"
