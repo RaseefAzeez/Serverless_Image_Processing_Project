@@ -59,3 +59,5 @@ Resources:
             Effect: Allow
             Principal: !GetAtt "myLambdaExeRole.Arn" #ARN of myExeLambda IAM Role needs to get updated here
             Resource: !Sub "arn:aws:s3:::${myOutputDatabucket}/*"
+
+#updated files needs to be pushed
