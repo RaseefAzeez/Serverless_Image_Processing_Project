@@ -5,128 +5,115 @@ terraform {
       version = "~> 6.0"
     }
   }
+
+  cloud {
+    organization = "Raseefz"
+
+    workspaces {
+      name = "Serverless_Image_Processing_Project"
+    }
+  }
 }
 
 # Configure the AWS Provider for terraform
+
+resource "aws_iam_openid_connect_provider" "github" {
+  url = "https://token.actions.githubusercontent.com"
+
+  client_id_list = [
+    "sts.amazonaws.com"
+  ]
+
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+}
+
 provider "aws" {
   region = "us-east-1"
 }
 
-resource "aws_iam_openid_connect_provider" "terraform_oidc" {
-  url = "https://app.terraform.io"
-
-  client_id_list = [
-    "aws.amazonaws.com",
-  ]
-  thumbprint_list = ["1dc87b5a0c7f5f82164f1e4baf28d4f5f32c9d44"]
-}
-
 resource "aws_iam_role" "terraform_oidc_role" {
-  name = "TerraformOIDCAuthRole"
+  name = "GithubOIDCAuthRole"
   assume_role_policy = jsonencode({
-    Version = "2012-10-17"
+    Version = "2012-10-17",
     Statement = [
       {
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Effect = "Allow"
-        Sid    = ""
+        Action = "sts:AssumeRoleWithWebIdentity",
+        Effect = "Allow",
+        Sid    = "",
         Principal = {
-          Federated = aws_iam_openid_connect_provider.terraform_oidc.arn
-        }
+          Federated = aws_iam_openid_connect_provider.github.arn
+        },
         Condition = {
           StringLike = {
-            "app.terraform.io:sub" = "organization:RaseefAzeez:project:*"
+            "token.actions.githubusercontent.com:sub" = "repo:RaseefAzeez/Serverless_Image_Processing_Project:*"
           }
         }
       },
     ]
   })
-
   tags = {
     tag-key = "tag-value"
   }
 }
 
 
-resource "aws_iam_role" "terraform_exec_role" {
-  name = "TerraformExecRole"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid      = "AllowOIDCRoleToAssume"
-        Action = "sts:AssumeRole"
-        Principal = {
-          AWS = aws_iam_role.terraform_oidc_role.arn
-        }
-        Effect = "Allow"
-      },
-    ]
-  })
-
-  tags = {
-    tag-key = "tag-value"
-  }
-}
 
 resource "aws_iam_policy" "terraform_exec_policy" {
   name        = "TerrafrormExecPolicy"
   //path        = "/"
-  description = "Policy to attach to Execution Role for Terraform"
+  description = "Policy to attach to OIDC role to attach to get access to AWS resources"
 
   # Terraform's "jsonencode" function converts a
   # Terraform expression result to valid JSON syntax.
   policy = jsonencode({
-    Version = "2012-10-17"
+    Version = "2012-10-17",
     Statement = [
       { 
-        Sid      = "AllowS3Access"
+        Sid      = "AllowS3Access",
+        Effect   = "Allow",
         Action = [
           "s3:PutObject",
           "s3:ListBucket",
           "s3:GetObject",
           "s3:GetBucketVersioning"
-        ]
-        Effect   = "Allow"
+        ],
         Resource = "*"
       },
 
       { 
-        Sid      = "AllowLambdaAccess"
+        Sid      = "AllowLambdaAccess",
+        Effect   = "Allow",
         Action = [
           "lambda:CreateFunction",
           "lambda:UpdateFunctionCode",
           "lambda:UpdateFunctionConfiguration",
           "lambda:GetFunction",
           "iam:PassRole"
-        ]
-        Effect   = "Allow"
+        ],
         Resource = "*"
       },
 
       { 
-        Sid      = "DynamoDBAccess"
+        Sid      = "DynamoDBAccess",
+        Effect   = "Allow",
         Action = [
           "dynamodb:CreateTable",
           "dynamodb:UpdateTable",
           "dynamodb:PutItem",
           "dynamodb:GetItem",
-          "dynamodb:DeleteItem",
-
-        ]
-        Effect   = "Allow"
+          "dynamodb:DeleteItem"
+        ],
         Resource = "*"
       },
 
       { 
-        Sid      = "SNSAccess"
+        Sid      = "SNSAccess",
+        Effect   = "Allow",
         Action = [
           "sns:CreateTopic",
           "sns:Publish",
-          "sns:Subscribe",
-          
-        ]
-        Effect   = "Allow"
+          "sns:Subscribe"  
+        ],
         Resource = "*"
       },
     ]
@@ -134,6 +121,6 @@ resource "aws_iam_policy" "terraform_exec_policy" {
 }
 
 resource "aws_iam_role_policy_attachment" "attach_exec_policy" {
-  role       = aws_iam_role.terraform_exec_role.name
+  role       = aws_iam_role.terraform_oidc_role.name
   policy_arn = aws_iam_policy.terraform_exec_policy.arn
 }

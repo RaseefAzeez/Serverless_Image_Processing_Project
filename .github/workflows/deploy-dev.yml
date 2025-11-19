@@ -1,14 +1,44 @@
-            - name: HashiCorp - Setup Terraform
-  # You may pin to the exact commit or the version.
-  # uses: hashicorp/setup-terraform@633666f66e0061ca3b725c73b2ec20cd13a8fdd1
-  uses: hashicorp/setup-terraform@v2.0.3
-  with:
-    # The hostname of a Terraform Cloud/Enterprise instance to place within the credentials block of the Terraform CLI configuration file. Defaults to `app.terraform.io`.
-    cli_config_credentials_hostname: # optional, default is app.terraform.io
-    # The API token for a Terraform Cloud/Enterprise instance to place within the credentials block of the Terraform CLI configuration file.
-    cli_config_credentials_token: # optional
-    # The version of Terraform CLI to install. Instead of full version string you can also specify constraint string starting with "<" (for example `<1.13.0`) to install the latest version satisfying the constraint. A value of `latest` will install the latest version of Terraform CLI. Defaults to `latest`.
-    terraform_version: # optional, default is latest
-    # Whether or not to install a wrapper to wrap subsequent calls of the `terraform` binary and expose its STDOUT, STDERR, and exit code as outputs named `stdout`, `stderr`, and `exitcode` respectively. Defaults to `true`.
-    terraform_wrapper: # optional, default is true
-          
+name: Terraform Deploy Dev Environment
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - infra-dev-setup
+  pull_request:
+
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform-plan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN_DEV }}
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.5
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./Projects/Infra/bootstrap
+
+      - name: Terraform Plan
+        run: terraform plan
+        working-directory: ./Projects/Infra/bootstrap
+
+      - name: Terraform Apply
+        if: ${{ github.ref == 'refs/heads/infra-dev-setup' && github.event_name == 'push' }}
+        run: terraform apply -auto-approve
+        working-directory: ./Projects/Infra/bootstrap
